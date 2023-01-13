@@ -1,0 +1,64 @@
+---
+title: "Elevation analysis of Europe"
+author: "RS-eco"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Elevation analysis of Europe}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  comment = "#>", echo=T, warning=F, message=F,
+  fig.width=9, fig.height=6
+)
+```
+
+```{r load_pkgs}
+library(dplyr); library(ggplot2); library(sf)
+```
+
+```{r}
+# Load shapefile of Europe
+data("europe", package="edc")
+```
+
+# General information
+
+# Data Analysis
+
+Here, I perform a first analysis of the SRTM elevation Data for Europe.
+
+The elevation data for Europe (srtm_csi_eur_900m.rda, srtm_csi_eur_p11deg.rda, srtm_csi_eur_p44deg.rda), which I use here, can be downloaded from https://github.com/RS-eco/edc/blob/main/data/.
+
+The code for how the elevation data was created can be found here: https://github.com/RS-eco/edc/blob/main/data-raw/srtm_eur.R
+
+## Elevation of Europe
+
+```{r eur_fine, fig.width=8, fig.height=9}
+data("srtm_csi_eur_p11deg", package="edc")
+
+# Plot individual variable from long format
+srtm_csi_eur_p11deg %>% ggplot() + 
+  geom_tile(aes (x=x, y=y, fill=alt_mean)) +
+  geom_sf(data=europe, fill="NA") + 
+  scale_fill_gradientn(name="Elevation (m)", colors=terrain.colors(255)) + 
+  coord_sf(expand=F) + theme_bw() + labs(x="", y="")
+rm(srtm_csi_eur_p11deg); invisible(gc())
+```
+
+```{r eur_rough, fig.width=8, fig.height=9}
+data("srtm_csi_eur_p44deg", package="edc")
+
+# Plot individual variable from long format
+srtm_csi_eur_p44deg %>% ggplot() + 
+  geom_tile(aes (x=x, y=y, fill=alt_mean)) +
+  geom_sf(data=europe, fill="NA") + 
+  scale_fill_gradientn(name="Elevation (m)", colors=terrain.colors(255)) + 
+  coord_sf(expand=F) + theme_bw() + labs(x="", y="")
+rm(srtm_csi_eur_p44deg); invisible(gc())
+```

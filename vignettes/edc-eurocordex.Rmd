@@ -1,0 +1,371 @@
+---
+title: "Euro-Cordex Data for Europe"
+author: "RS-eco"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Euro-Cordex Data for Europe}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  results="asis", cache=F,
+  echo=F, warning=F, message=F,
+  fig.width=10, fig.height=8
+)
+```
+
+```{r load_pkgs}
+library(dplyr); library(magrittr); library(tidyr); library(ggplot2)
+library(ggthemes); library(patchwork); library(zoo)
+
+# Define standard colour scheme
+whitered <- colorRampPalette(c('#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'))(255)
+#pie(rep(1,9),col=c('#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'))
+
+whiteblue <- colorRampPalette(c('#f7fcf0','#e0f3db','#ccebc5','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'))(255)
+#pie(rep(1,9),col=c('#f7fcf0','#e0f3db','#ccebc5','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'))
+
+bluewhitered <- colorRampPalette(c("#009392","#39b185","#9ccb86","#e9e29c","#eeb479","#e88471","#cf597e"))(255)
+#pie(rep(1,7),col=c("#009392","#39b185","#9ccb86","#e9e29c","#eeb479","#e88471","#cf597e"))
+```
+
+```{r}
+# Load shapefile of Europe
+data("europe", package="edc")
+```
+
+# General information
+
+An analysis of the Euro-Codex data for Europe can be found here: https://www.dkrz.de/projekte-und-partner/HLRE-Projekte/focus/regionale-klimaprojektionen-fuer-europa
+
+The Euro-Cordex data have been derived from: https://esgf-data.dkrz.de/search/cordex-dkrz/
+
+More information on the Euro-Cordex project can be found here: https://euro-cordex.net/060378/index.php.en
+
+An analysis of the Euro-Codex data for Europe can be found here: https://www.dkrz.de/projekte-und-partner/HLRE-Projekte/focus/regionale-klimaprojektionen-fuer-europa
+
+# Data Overview
+
+Here we use the CORDEX regional climate model (RCM) simulations for the European Domain (EUR-11) at the finer resolution of 0.11° (~12.5km). We use monthly bias-Adjusted data of minimum and maximum temperature as well as total precipitation (*pr*, *tasmin* and *tasmax*). The data comes in the form of monthly values in NetCDF-format and cover a time period from 1950 to 2100.
+
+We use 30-year averages of the monthly values of those three variables to calculate the 19 bioclimatic variables commonly used for species distribution models. Bioclimatic variables were calculated using the `biovars()` function from the **dismo** package.
+
+## Bioclimatic variables
+
+Bioclimatic variables are derived from the monthly temperature and rainfall values in order to generate more biologically meaningful variables. These are often used in species distribution modeling and related ecological modeling techniques. The bioclimatic variables represent annual trends (e.g., mean annual temperature, annual precipitation) seasonality (e.g., annual range in temperature and precipitation) and extreme or limiting environmental factors (e.g., temperature of the coldest and warmest month, and precipitation of the wet and dry quarters). A quarter is a period of three months (1/4 of the year).
+
+They are coded as follows:
+  
+BIO1 = Annual Mean Temperature  
+BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))  
+BIO3 = Isothermality (BIO2/BIO7) (* 100)  
+BIO4 = Temperature Seasonality (standard deviation *100)  
+BIO5 = Max Temperature of Warmest Month  
+BIO6 = Min Temperature of Coldest Month  
+BIO7 = Temperature Annual Range (BIO5-BIO6)  
+BIO8 = Mean Temperature of Wettest Quarter  
+BIO9 = Mean Temperature of Driest Quarter  
+BIO10 = Mean Temperature of Warmest Quarter  
+BIO11 = Mean Temperature of Coldest Quarter  
+BIO12 = Annual Precipitation  
+BIO13 = Precipitation of Wettest Month  
+BIO14 = Precipitation of Driest Month  
+BIO15 = Precipitation Seasonality (Coefficient of Variation)  
+BIO16 = Precipitation of Wettest Quarter  
+BIO17 = Precipitation of Driest Quarter  
+BIO18 = Precipitation of Warmest Quarter  
+BIO19 = Precipitation of Coldest Quarter  
+
+The datasets (*cordex_bioclim_eur.rda, cordex_bioclim_eur_p44deg.rda*) just contains the data of three 30-year time periods (**1991-2020, 2041-2070, 2071-2100**) and consists of 27 columns with the following names:
+  
+x, y, gcm, ensemble, rcm, rs, rcp, time_frame, bio1, bio2, bio3, bio4, bio5, bio6, bio7, bio8, bio9, bio10, bio11, bio12, bio13, bio14, bio15, bio16, bio17, bio18, bio19
+
+Here I explain each of the columns:
+
+- x & y are the coordinates of the grid cells
+
+- gcm is the global climate model used for the simulations and can have one of the following three values: ICHEC-EC-EARTH, IPSL-IPSL-CM5A-MR, MPI-M-MPI-ESM-LR
+
+- ensemble is the used ensemble: r1i1p1
+
+- rcm ist the regional climate model used for the simulation and can be one of three values: KNMI-RACMO22E, MPI-CSC-REMO2009, SMHI-RCA4
+
+- rs is the downscaling realisation: v1
+
+- rcp is the Representative Concentration Pathway used and can be one of three values: RCP2.6, RCP4.5 and RCP8.5
+
+- time_frame ist the 30-year time period. Here I provide data for three different periods: 1991-2020, 2041-2070, 2071-2100.
+
+- The variables bio1 - bio19 are the 19 bioclimatic variables (which I explained above or are also described here: http://worldclim.org/bioclim).
+
+##############
+
+**Note: For each gcm, ensemble, rcm, rs, rcp and time_frame combination there is a complete set of climte data for each grid cell. To use a specific combination, please `filter()` or `subset()` your dataframe accordingly..**
+
+###############
+
+**Note: The bias-adjusted data has no output for a historical experiment, unlike the original (non bias-adjusted) data. And some GCM/RCM combinations are also not available for the bias-adjusted data.**
+
+<!--
+| Driving Model         | output                           || bias-adjusted (tas, pr)          || bias-adjusted (+tmin, +tmax)      ||           
+|-----------------------|-----------|-----------|-----------|-----------|-----------|-----------|------------|-----------|-----------|
+| **Experiment**        | **rcp26** | **rcp45** | **rcp85** | **rcp26** | **rcp45** | **rcp85** | **rcp26**  | **rcp45** | **rcp85** |
+| CNRM-CERFACS-CNRM-CM5 |           |           |         √ |           |           | 
+| ECMWF-ERAINT          | 
+| ICHEC-EC-EARTH        | 
+| IPSL-IPSL-CM5A-LR     | 
+| IPSL-IPSL-CM5A-MR     | 
+| MIROC-MIROC5          | 
+| MOHC-HadGEM2-ES       | 
+| MPI-M-MPI-ESM-LR      | 
+| NCC-NorESM1-M         | 
+| NOAA-GFDL-GFDL-ESM2G  |
+see also table in Link above!!!
+-->
+
+# Data Analysis
+
+Here, I perform a first analysis of the Euro-Cordex bias-adjusted temperature and precipitation data for Europe at 0.11 degree (EUR-11, ~12.5 km).
+
+The Euro-Cordex data for Europe (cordex_bioclim_eur.rda, cordex_bioclim_eur_p44deg.rda), which I use here, can be downloaded from https://github.com/RS-eco/edc/blob/master/data/.
+
+The code for how the Euro-Cordex data (cordex_bioclim_eur.rda, cordex_bioclim_eur_p44deg.rda) was created can be found here: https://github.com/RS-eco/edc/blob/master/data-raw/euro_cordex_eur.R
+
+## Bioclimatic variables
+
+```{r}
+#data("cordex_bioclim_eur", package="edc")
+data("cordex_bioclim_eur_p44deg", package="edc")
+```
+
+### Temporal patterns
+
+```{r, fig.width=10, fig.height=10}
+tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>% mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  ggplot() + geom_violin(aes(x=time_frame, y=value, fill=rcp)) + 
+  facet_wrap(.~var, scales="free_y", strip.position = "left", ncol=4) + 
+  theme_few() + theme(strip.background = element_blank(),
+                       legend.position=c(0.9,0.05), strip.placement = "outside",
+                       axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  scale_fill_manual(name="", values=c("#0099B4FF", "#ADB6B6FF", "#AD002AFF")) + labs(x="", y="")
+```
+
+**Fig. 01.** Temporal changes in bioclimatic conditions for the different rcps. The individual violins show the variation among x, y, gcms, rcms and ensemble.
+
+```{r, fig.width=10, fig.height=10}
+tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  filter(var == "bio1") %>% ggplot() + geom_violin(aes(x=time_frame, y=value, fill=rcp)) + 
+  facet_wrap(.~gcm+rcm+ensemble, ncol=5) + 
+  theme_few() + theme(legend.position=c(0.9,0.2), axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  scale_fill_manual(name="", values=c("#0099B4FF", "#ADB6B6FF", "#AD002AFF")) + labs(x="", y="")
+```
+
+**Fig. 02.** Temporal changes in bio1 for the different rcps and gcm, rcm and ensemble combinations. The individual violins show the variation in x and y.
+
+```{r, fig.width=10, fig.height=10}
+tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  filter(var == "bio12") %>% ggplot() + geom_violin(aes(x=time_frame, y=value, fill=rcp)) + 
+  facet_wrap(.~gcm+rcm+ensemble, ncol=5) + 
+  theme_few() + theme(legend.position=c(0.9,0.2), axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  scale_fill_manual(name="", values=c("#0099B4FF", "#ADB6B6FF", "#AD002AFF")) + labs(x="", y="")
+```
+
+**Fig. 03.** Temporal changes in bio12 for the different rcps and gcm, rcm and ensemble combinations. The individual violins show the variation in x and y.
+
+### Spatial patterns
+
+```{r}
+dat <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  filter(var == "bio1") %>%
+  group_by(x, y, time_frame, rcp, var) %>% summarise(value=mean(value))
+col_val <- scales::rescale(quantile(dat$value, probs=seq(0,1,0.12)))
+lim <- c(min(dat$value, na.rm=T), max(dat$value, na.rm=T))
+dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + 
+  facet_grid(rcp~time_frame, switch = "y") + geom_sf(data=europe, fill="NA") + 
+  scale_fill_gradientn(name="bio1", colours=whitered, limits=lim, values=col_val) + 
+  coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  labs(x="", y="")
+```
+
+**Fig. 04.** Map of bio1 for the three selected time periods (1991-2020, 2041-2070, 2071-2100) and the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r}
+dat <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  filter(var == "bio4") %>%
+  group_by(x, y, time_frame, rcp, var) %>% summarise(value=mean(value))
+col_val <- scales::rescale(quantile(dat$value, probs=seq(0,1,0.12)))
+lim <- c(min(dat$value, na.rm=T), max(dat$value, na.rm=T))
+dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + 
+  facet_grid(rcp~time_frame, switch = "y") + geom_sf(data=europe, fill="NA") + 
+  scale_fill_gradientn(name="bio4", colours=whitered, limits=lim, values=col_val) + 
+  coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  labs(x="", y="")
+```
+
+**Fig. 05.** Map of bio4 for the three selected time periods (1991-2020, 2041-2070, 2071-2100) and the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r}
+dat <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  filter(var == "bio5") %>%
+  group_by(x, y, time_frame, rcp, var) %>% summarise(value=mean(value))
+col_val <- scales::rescale(quantile(dat$value, probs=seq(0,1,0.12)))
+lim <- c(min(dat$value, na.rm=T), max(dat$value, na.rm=T))
+
+dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + geom_sf(data=europe, fill="NA") + 
+  facet_grid(rcp~time_frame, switch = "y") + scale_fill_gradientn(name="bio5", colours=whitered, limits=lim, values=col_val) + 
+  coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  labs(x="", y="")
+```
+
+**Fig. 06.** Map of bio5 for the three selected time periods (1991-2020, 2041-2070, 2071-2100) and the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r}
+dat <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  filter(var == "bio12") %>%
+  group_by(x, y, time_frame, rcp, var) %>% summarise(value=mean(value))
+col_val <- scales::rescale(quantile(dat$value, probs=seq(0,1,0.12)))
+lim <- c(min(dat$value, na.rm=T), max(dat$value, na.rm=T))
+dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + geom_sf(data=europe, fill="NA") + 
+  facet_grid(rcp~time_frame, switch = "y") + scale_fill_gradientn(name="bio12", colours=whiteblue, limits=lim, values=col_val) + 
+  coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  labs(x="", y="")
+```
+
+**Fig. 07.** Map of bio12 for the three selected time periods (1991-2020, 2041-2070, 2071-2100) and the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r}
+dat <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>%
+  mutate(var = factor(var, levels=paste0("bio", 1:19))) %>% 
+  filter(var == "bio15") %>%
+  group_by(x, y, time_frame, rcp, var) %>% summarise(value=mean(value))
+col_val <- scales::rescale(quantile(dat$value, probs=seq(0,1,0.12)))
+lim <- c(min(dat$value, na.rm=T), max(dat$value, na.rm=T))
+dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + geom_sf(data=europe, fill="NA") + 
+  facet_grid(rcp~time_frame, switch = "y") + scale_fill_gradientn(name="bio15", colours=whiteblue, limits=lim, values=col_val) + 
+  coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
+  labs(x="", y="")
+```
+
+**Fig. 08.** Map of bio15 for the three selected time periods (1991-2020, 2041-2070, 2071-2100) and the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+### Spatial change
+
+#### 2021 - 2050
+
+```{r, fig.width=10, fig.height=7}
+# Plot bioclimatic changes between 1991-2020 and 2021 - 2050
+bioclim_30yr <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>% 
+  group_by(x, y, time_frame, var, rcp) %>% summarise(value=mean(value)) %>%
+  tidyr::spread(time_frame,value) %>% filter(var == "bio1")
+bioclim_30yr$change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)
+bioclim_30yr$rel_change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)/bioclim_30yr$`1991-2020`*100
+
+col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="change", colours=whitered, limits=lim, values=col_val) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+
+#col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
+#lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="% change", colours=whitered) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+p1 + p2 + plot_layout(ncol=1)
+```
+
+**Fig. 09.** Change (top) and relative change (bottom) of bio1 until 2041-2070 for the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r, fig.width=10, fig.height=7}
+# Plot bioclimatic changes between 1991-2020 and 2021 - 2050
+bioclim_30yr <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>% 
+  group_by(x, y, time_frame, var, rcp) %>% summarise(value=mean(value)) %>%
+  tidyr::spread(time_frame,value) %>% filter(var == "bio12")
+bioclim_30yr$change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)
+bioclim_30yr$rel_change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)/bioclim_30yr$`1991-2020`*100
+
+col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="change", colours=whiteblue, limits=lim, values=col_val) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+
+col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="% change", colours=whiteblue, limits=lim, values=col_val) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+p1 + p2 + plot_layout(ncol=1)
+```
+
+**Fig. 10.** Change (top) and relative change (bottom) of bio12 until 2041-2070 for the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+#### 2071 - 2100
+
+```{r, fig.width=10, fig.height=7}
+# Plot bioclimatic changes between 1991-2020 and 2021 - 2050
+bioclim_30yr <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>% 
+  group_by(x, y, time_frame, var, rcp) %>% summarise(value=mean(value)) %>%
+  tidyr::spread(time_frame,value) %>% filter(var == "bio1")
+bioclim_30yr$change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)
+bioclim_30yr$rel_change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)/bioclim_30yr$`1991-2020`*100
+
+col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="change", colours=whitered, limits=lim, values=col_val) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+
+#col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
+#lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
+p2 <- bioclim_30yr %>% 
+  ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="% change", colours=whitered) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+p1 + p2 + plot_layout(ncol=1)
+```
+
+**Fig. 11.** Change (top) and relative change (bottom) of bio1 until 2071-2100 for the three rcps (RCP2.6, RCP4.5, RCP8.5).
+
+```{r, fig.width=10, fig.height=7}
+# Plot bioclimatic changes between 1991-2020 and 2021 - 2050
+bioclim_30yr <- tidyr::gather(cordex_bioclim_eur_p44deg, var, value, -c(x,y,time_frame,gcm,rcp,rcm,ensemble,rs)) %>% 
+  group_by(x, y, time_frame, var, rcp) %>% summarise(value=mean(value)) %>%
+  tidyr::spread(time_frame,value) %>% filter(var == "bio12")
+bioclim_30yr$change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)
+bioclim_30yr$rel_change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)/bioclim_30yr$`1991-2020`*100
+
+col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="change", colours=whiteblue, limits=lim, values=col_val) +
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+
+col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
+lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+  scale_fill_gradientn(name="% change", colours=whiteblue, limits=lim, values=col_val) + 
+  geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+p1 + p2 + plot_layout(ncol=1)
+rm(list=ls()); gc()
+```
+
+**Fig. 12.** Change (top) and relative change (bottom) of bio12 until 2071-2100 for the three rcps (RCP2.6, RCP4.5, RCP8.5).

@@ -1,0 +1,160 @@
+---
+title: "IUCN & BirdLife Data for Europe"
+author: "RS-eco"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{IUCN & BirdLife Data for Europe}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>", results="asis",
+  warning=F, message=F, fig.width=9, fig.height=4
+)
+```
+
+```{r}
+# Load packages
+library(dplyr); library(magrittr); library(tidyr)
+library(ggplot2); library(sf); library(patchwork)
+library(scico)
+
+# Load edc package
+library(edc)
+
+# Load shapefile of Europe
+data("europe", package="edc")
+```
+
+# General information
+
+The IUCN data originate from: https://www.iucnredlist.org/resources/spatial-data-download
+The BirdLife data originate: http://datazone.birdlife.org/species/requestdis
+
+Both datasets originally come in the form of shapefiles (vector data) and were converted into a raster grid corresponding to the resolution of the EUR-11 Euro-Cordex climate data (0.11°).
+
+##############
+
+Both datasets contain 7 columns with the following names:
+
+x, y, perc_present, binomial, presence, origin, seasonal
+
+Here each of these columns is explained:
+
+- x & y are the geographic coordinates of each grid cell
+
+- perc_present gives you the percentage cover of each grid cell of the shapefile of the respective species
+
+- binomial gives you the name of the respective species
+
+presence, origin and seasonal are additional information about the distribution of a species:
+
+- presence describes the degree of certainty of the existence of a species in a certain region
+
+- origin describes, if the species has its native origin in a certain region
+
+- seasonal describes beschreibt den Zeitraum im Lebenszyklus der Art, in dem sie in einem Gebiet vorkommt.
+
+More details on the presence, origin and seasonal information can be found below or here: http://datazone.birdlife.org/species/spcdistPOS
+
+##############
+
+**Note: Because of the additional information (presence, origin und seasonal), it can be that there are multiple values for one species at one location. Before you use the data, you might have to filter()/subset() the data or summarise() the perc_present column in order to use it.**
+
+##############
+
+### Presence, Origin and Seasonal information
+
+#### Presence:
+
+1 = Extant: The species is known or thought very likely to occur presently in the area, usually encompassing current or recent localities where suitable habitat at appropriate altitudes remains.
+
+2 = Probably Extant: The species’ presence is considered probable, either based on extrapolations of known records, or realistic inferences (e.g., based on distribution of suitable habitat at appropriate altitudes and proximity to areas where it is known or thought very likely to remain Extant). ‘Probably Extant’ ranges often extend beyond areas where the species is Extant, or may fall between them.
+
+3 = Possibly Extant: The species may possibly occur, based on the distribution of suitable habitat at appropriate altitudes, but where there are no known records. ‘Possibly Extant’ ranges often extend beyond areas where the species is Extant (q.v.) or Probably Extant (q.v.), or may fall between them.
+
+4 = Possibly Extinct: The species was formerly known or thought very likely to occur in the area, but it is most likely now extirpated from the area because habitat loss/other threats are thought likely to have extirpated the species and/or owing to a lack of records in the last 30 years.
+
+5 = Extinct (post 1500): The species was formerly known or thought very likely to occur in the area, but there have been no records in the last 30 years and it is almost certain that the species no longer occurs, and/or habitat loss/other threats have almost certainly extirpated the species.
+
+6 = Presence Uncertain: The species was formerly known or thought very likely to occur in the area but it is no longer known whether it still occurs (usually because there have been no recent surveys).
+
+#### Origin:
+
+1 = Native: The species is/was native to the area
+
+2 = Reintroduced: The species is/was reintroduced through either direct or indirect human activity
+
+3 = Introduced: The species is/was introduced outside of its historical distribution range through either direct or indirect human activity.
+
+4 = Vagrant: The species is/was recorded once or sporadically, but it is known not to be native to the area.
+
+5 = Origin Uncertain: The species’ provenance in an area is not known (it may be native, reintroduced or introduced).
+
+#### Seasonality:
+
+1 = Resident: The species is/was known or thought very likely to be resident throughout the year
+
+2 = Breeding Season: The species is/was known or thought very likely to occur regularly during the breeding season and to breed.
+
+3 = Non-breeding Season: The species is/was known or thought very likely to occur regularly during the non-breeding season. In the Eurasian and North American contexts, this encompasses ‘winter’.
+
+4 = Passage: The species is/was known or thought very likely to occur regularly during a relatively short period(s) of the year on migration between breeding and non-breeding ranges.
+
+5 = Seasonal occurence uncertain: The species is/was present, but it is not known if it is present during part or all of the year.
+
+# Load & plot data
+
+## Odonata
+
+```{r}
+# Load data of all Odonata species
+data("iucn_odonata_eur_p11deg")
+
+# Select data for Aeshna viridis and plot presence, origin and season information
+p1 <- iucn_odonata_eur_p11deg %>% filter(binomial == "Aeshna viridis") %>%
+ ggplot() + geom_tile(aes(x=x, y=y, fill=as.factor(presence))) +
+  geom_sf(data=europe, fill=NA) + coord_sf() +
+  scale_fill_discrete(name="Presence") + labs(x="", y="") + 
+  theme_bw() + theme(legend.position = "bottom")
+p2 <- iucn_odonata_eur_p11deg %>% filter(binomial == "Aeshna viridis") %>%
+ ggplot() + geom_tile(aes(x=x, y=y, fill=as.factor(origin))) +
+  geom_sf(data=europe, fill=NA) + coord_sf() +
+  scale_fill_discrete(name="Origin") + labs(x="", y="") + 
+  theme_bw() + theme(legend.position = "bottom")
+p3 <- iucn_odonata_eur_p11deg %>% filter(binomial == "Aeshna viridis") %>%
+ ggplot() + geom_tile(aes(x=x, y=y, fill=as.factor(presence))) +
+  geom_sf(data=europe, fill=NA) + coord_sf() +
+  scale_fill_discrete(name="Seasonal") + labs(x="", y="") + 
+  theme_bw() + theme(legend.position = "bottom")
+p1 + p2 + p3
+```
+
+## Aves
+
+```{r}
+# Load data for all bird species
+data("birdlife_eur_p11deg")
+
+# Select data for all Vanellus species and plot percentage cover data
+birdlife_eur_p11deg %>% 
+  filter(binomial %in% c("Vanellus gregarius", "Vanellus spinosus", "Vanellus vanellus")) %>%
+  ggplot() + geom_tile(aes(x=x, y=y, fill=perc_present)) +
+  facet_wrap(.~binomial) + 
+  geom_sf(data=europe, fill=NA) + coord_sf() + 
+   scale_fill_scico(palette = 'roma') + 
+  labs(x="", y="") + theme_bw()
+
+# Plot data of Vanellus spinosus
+birdlife_eur_p11deg %>% 
+  filter(binomial == "Vanellus spinosus") %>%
+  ggplot() + geom_tile(aes(x=x, y=y, fill=perc_present)) +
+  scale_fill_scico(palette = 'roma') + 
+  labs(x="", y="") + theme_bw()
+rm(list=ls()); gc()
+```

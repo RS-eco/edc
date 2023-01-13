@@ -1,0 +1,561 @@
+## ----setup, include = FALSE---------------------------------------------------
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>", results="asis",
+  warning=F, message=F, fig.width=8, fig.height=8
+)
+
+## -----------------------------------------------------------------------------
+# Load packages
+library(dplyr); library(magrittr); library(tidyr)
+library(sp); library(sf)
+library(ggplot2); library(patchwork)
+
+# Load edc package
+library(edc)
+
+# Load shapefile of Europe
+data("europe", package="edc")
+
+## -----------------------------------------------------------------------------
+# EBCC data for selected bird species
+data("ebcc_Sylvia_curruca")
+data("ebcc_Turdus_torquatus")
+data("ebcc_Phylloscopus_bonelli")
+data("ebcc_Vanellus_vanellus")
+
+# For other species, load the entire EBCC data, with:
+# data("ebcc_eur")
+
+# Quick look at data
+#head(ebcc_Vanellus_vanellus)
+
+# Turn species into one data.frame
+ebcc_sub <- bind_rows(list(ebcc_Sylvia_curruca, ebcc_Turdus_torquatus, 
+                           ebcc_Phylloscopus_bonelli, ebcc_Vanellus_vanellus)) %>%
+  as.data.frame()
+
+# Convert data into a SpatialPointsDataFrame
+coordinates(ebcc_sub) <- ~decimalLongitude+decimalLatitude # set coordinates
+raster::projection(ebcc_sub) <- CRS("+proj=longlat +datum=WGS84") # set projection
+
+## -----------------------------------------------------------------------------
+# Corine data for whole of Europe
+data("corine_lc_eur_p44deg")
+
+# Select land-cover data for 2018
+corine_lc_eur_p44deg <- corine_lc_eur_p44deg %>% select(c(x,y,var, `2018`)) %>% spread(var, `2018`)
+#coordinates(clc_eur_grid) <- ~x+y # set coordinates
+#projection(clc_eur_grid) <- CRS("+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs") # set 
+#gridded(clc_eur_grid) <- TRUE  
+#clc_eur_grid <- projectRaster(clc_eur_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#clc_eur_grid
+#plot(clc_eur_grid)
+
+# Elevation data 
+data("srtm_csi_eur_p44deg")
+
+# Elevation - Rastergrid 
+#coordinates(srtm_eur_grid) <- ~x+y # set coordinates
+#gridded(srtm_eur_grid) <- TRUE                # grid the data
+#projection(srtm_eur_grid) <- CRS("+proj=longlat +datum=WGS84") # set projection
+# Turn SpatialPixelsDataFrame into Raster Stack
+#srtm_eur_grid <- stack(srtm_eur_grid)
+#plot(srtm_eur_grid[[1]])
+#srtm_eur_grid
+
+#Climate data
+data("cordex_bioclim_eur_p44deg")
+
+# Split data by scenario and timeframe to be able to use rasterFromXYZ
+groupkeys <- cordex_bioclim_eur_p44deg %>% 
+  tidyr::unite(col="gcm_rcm_rcp", c("gcm", "ensemble", "rcm", "rs", "rcp"), sep="_") %>% 
+  group_by(gcm_rcm_rcp, time_frame) %>% group_keys()
+cordex_bioclim_eur_p44deg <- cordex_bioclim_eur_p44deg %>% 
+  tidyr::unite(col="gcm_rcm_rcp", c("gcm", "ensemble", "rcm", "rs", "rcp"), sep="_") %>% 
+  group_split(gcm_rcm_rcp, time_frame, .keep=F)
+
+## -----------------------------------------------------------------------------
+# Turn data into raster objects
+srtm <- srtm_csi_eur_p44deg %>% raster::rasterFromXYZ(crs="+init=EPSG:4326")
+corine_lc <- corine_lc_eur_p44deg %>% raster::rasterFromXYZ(crs="+init=EPSG:4326")
+bioclim <- cordex_bioclim_eur_p44deg[[1]] %>% raster::rasterFromXYZ(crs="+init=EPSG:4326")
+
+# Merge data
+srtm <- raster::extend(srtm, corine_lc)
+r_all_dat <- raster::stack(srtm, corine_lc, bioclim)
+
+## -----------------------------------------------------------------------------
+ebcc_env <- raster::extract(r_all_dat, ebcc_sub, sp=T) %>% as.data.frame()
+
+p1 <- ebcc_env %>% ggplot() + geom_violin(aes(x=occurrenceStatus, y=bio1)) + theme_bw() + 
+  facet_grid(.~species)
+p2 <- ebcc_env %>% ggplot() + geom_violin(aes(x=occurrenceStatus, y=bio12)) + theme_bw() + 
+  facet_grid(.~species)
+p3 <- ebcc_env %>% ggplot() + geom_violin(aes(x=occurrenceStatus, y=alt_mean)) + 
+  theme_bw() + facet_grid(.~species)
+p1 / p2 / p3
+rm(list=ls()); gc()
+
+## ---- eval=F------------------------------------------------------------------
+#  
+#  # Corine Landcover Data # Gridsize: 10 km x 10km
+#  clc_ch <- read.csv("corine_lc_che_10km.csv.xz")
+#  
+#  # Load outline of Switzerland
+#  che <- getData('GADM', country='CHE', level=0)
+#  
+#  # Elevation  # Gridsize: 10km x 10km
+#  srtm_ch <- read.csv("srtm_csi_10km_che.csv.xz")
+#  
+#  #Climate data: climate data from National Centre for Climate, Schweizerische Eidgenossenschaft
+#  # Gridsize: 2kmx2km
+#  climdat_ch <- read.csv("cordex_bioclim_che.csv.xz")
+#  
+#  #----------------------------------------------------------------------------------------------------
+#  # 2. REFORMATE DATA INTO RASTERGRID / TRANSFORMATE COORDINATE SYSTEM
+#  #---------------------------------------------------------------------------------------------------
+#  
+#  # Sylvia curruca
+#  Sycu_ch_grid <- rasterFromXYZ(Sycu_ch)
+#  projection(Sycu_ch_grid) <- CRS("+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +units=m +no_defs") # set projection
+#  Sycu_ch_grid <- projectRaster(Sycu_ch_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#  plot(Sycu_ch_grid)
+#  Sycu_ch_grid
+#  
+#  # Turdus torquatus
+#  Tuto_ch_grid <- rasterFromXYZ(Tuto_ch)
+#  projection(Tuto_ch_grid) <- CRS("+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs") # set projection
+#  Tuto_ch_grid <- projectRaster(Tuto_ch_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#  plot(Tuto_ch_grid)
+#  Tuto_ch_grid
+#  
+#  # Phylloscopus bonelli
+#  Phbo_ch_grid <- rasterFromXYZ(Phbo_ch)
+#  projection(Phbo_ch_grid) <- CRS("+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs") # set projection
+#  Phbo_ch_grid<- projectRaster(Phbo_ch_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#  plot(Phbo_ch_grid)
+#  Phbo_ch_grid
+#  
+#  #---------------------
+#  # Landcover
+#  clc_ch <- clc_ch %>%select(c(x,y,var, X2018)) %>% spread(var, X2018) # hier erzeuge ich eine Gruppe die nur die Var. des X2018 ber?cksichtig
+#  clc_ch_grid <- rasterFromXYZ(clc_ch)
+#  projection(clc_ch_grid) <- CRS("+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs") # set projection
+#  #( EPSG:3035 ETRS89-extended / LAEA Europ)
+#  clc_ch_grid
+#  
+#  # Change Data in WGS84
+#  clc_ch_grid <- projectRaster(clc_ch_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#  clc_ch_grid
+#  plot(clc_ch_grid)
+#  
+#  # --------------------
+#  # Elevation
+#  srtm_ch_grid <- srtm_ch
+#  coordinates(srtm_ch_grid) <- ~x+y # set coordinates
+#  gridded(srtm_ch_grid) <- TRUE                # grid the data
+#  projection(srtm_ch_grid) <- CRS("+proj=longlat +datum=WGS84") # set projection
+#  srtm_ch_grid
+#  
+#  # Turn SpatialPixelsDataFrame into Raster Stack
+#  srtm_ch_grid <- stack(srtm_ch_grid)
+#  srtm_ch_grid
+#  plot(srtm_ch_grid)
+#  
+#  #--------------------------------
+#  # Elevation - Slope and Aspect
+#  srtm_sa <- srtm_ch
+#  coordinates(srtm_sa) <- ~x+y # set coordinates
+#  gridded(srtm_sa) <- TRUE                # grid the data
+#  projection(srtm_sa) <- CRS("+proj=longlat +datum=WGS84") # set projection
+#  srtm_sa
+#  
+#  # Turn spatialpixelsDataFrame in Raster Layer (grundlage f?r terrain)
+#  srtm_sa_r <-raster(srtm_sa)
+#  srtm_sa_r
+#  
+#  # create slope and Ascpet of Elevationraster
+#  srtm_sa_grid <- terrain(srtm_sa_r, opt=c('slope', 'aspect'), unit='degrees')
+#  plot(srtm_sa_grid)
+#  head(srtm_sa_grid)
+#  
+#  # convert Raster (Slope, Aspect, Elevtion ) in Raster stack
+#  
+#  # Turn Rasterlayer into Raster Stack
+#  srtm_sa_grid <- stack(srtm_sa_grid)
+#  srtm_sa_grid
+#  plot(srtm_sa_grid)
+#  
+#  #--------------------
+#  # Clima Data (Original Euro Cordex Data)
+#  
+#  # Split data by scenario and timeframe to be able to use rasterFromXYZ
+#  
+#  groupkeys <- climdat_ch %>% tidyr::unite(col="gcm_rcm_rcp", c("gcm", "ensemble", "rcm", "rs", "rcp"), sep="_") %>%
+#    group_keys(gcm_rcm_rcp, time_frame)
+#  climdat_ch_grid <- climdat_ch %>% tidyr::unite(col="gcm_rcm_rcp", c("gcm", "ensemble", "rcm", "rs", "rcp"), sep="_") %>%
+#    group_split(gcm_rcm_rcp, time_frame, .keep=F)
+#  climdat_ch_grid
+#  
+#  #' The rasterFromXYZ function requires that your data.frame is structured in a very specific way,
+#  #' i.e. first column is x, second column is y and the remaining columns can only be numeric variables.
+#  
+#  # Turn data into a list of raster objects
+#  # hier erst mal alles weitere nur mit der ersten Gruppe (1) machen, dies m?sste aber auch noch in alle 21 Gruppen aufgeteilt und genau so wiederholt werden
+#  climdat_ch_grid <- lapply(climdat_ch_grid, raster::rasterFromXYZ)
+#  raster::plot(climdat_ch_grid[[7]][[7]]) # plot Gruppe 7 und Variable 7 of climdat_ch_grid
+#  plot((che), add=T)
+#  
+#  #' Data has no CRS
+#  # Define CRS (WGS84)
+#  climdat_ch_grid <- lapply(climdat_ch_grid, function(x){
+#    raster::crs(x) <- "+init=EPSG:4326"
+#    return(x)
+#  })
+#  
+#  #------------------------------------------------------------------------------------------------
+#  # Create Climate Groupkeys
+#  #----------------------------------------------------------------------------------------------
+#  
+#  # for RCP 4.5: IPSL-IPSL-CM5A-MR   -   SMHI-RCA4
+#  # Timeframes: CH Datensatz Gruppe [[7]] (1991-2020) [[8]] 2041-2070
+#  
+#  climdat_ch_grid[[7]]
+#  IPSMRC4520 <- climdat_ch_grid[[7]]
+#  IPSMRC4520
+#  climdat_ch_grid[[8]]
+#  IPSMRC4570 <- climdat_ch_grid[[8]]
+#  IPSMRC4570
+#  
+#  # RCP 8.5: IPSL-IPSL-CM5A-MR - SMHI-RCA4
+#  # Timeframes: CH Datensatz Gruppe [[10]] (1991-2020) [[11]] 2041-2070
+#  
+#  climdat_ch_grid[[10]]
+#  IPSMRC8520 <- climdat_ch_grid[[10]]
+#  IPSMRC8520
+#  
+#  climdat_ch_grid[[11]]
+#  IPSMRC8570 <- climdat_ch_grid[[11]]
+#  IPSMRC8570
+#  
+#  # RCP 4.5: MPI-M-MPI-ESM-LR - MPI-CSC-REMO2009
+#  # Timeframes: CH Datensatz Gruppe [[16]] (1991-2020) [[17]] 2041-20
+#  
+#  climdat_ch_grid[[16]]
+#  MMMPRE4520 <- climdat_ch_grid[[16]]
+#  MMMPRE4520
+#  
+#  climdat_ch_grid[[17]]
+#  MMMPRE4570 <- climdat_ch_grid[[17]]
+#  MMMPRE4570
+#  
+#  # RCP 8.5: MPI-M-MPI-ESM-LR - MPI-CSC-REMO2009
+#  # Timeframes: CH Datensatz Gruppe [[19]] (1991-2020) [[20]] 2041-2070
+#  climdat_ch_grid[[19]]
+#  MMMPRE8520 <- climdat_ch_grid[[19]]
+#  MMMPRE8520
+#  
+#  climdat_ch_grid[[20]]
+#  MMMPRE8570 <- climdat_ch_grid[[20]]
+#  MMMPRE8570
+#  
+#  #' **Note:** The climdat_eur_grid file is now a list of raster objects (multiple raster stacks in one object),
+#  #' which means you cannot directly use raster functions, but you will need to wrap them around an lapply() command.
+#  ###
+#  #-------------------------------------------------------------------------------------------------
+#  # 3. CHANGE RESOLUTION INTO GRIDSIZE 10 km x 10 km
+#  #------------------------------------------------------------------------------------------------
+#  # Sylvia curruca
+#  # show grids, resolutions and extents to compare
+#  clc_ch_grid
+#  srtm_ch_grid
+#  srtm_sa_grid
+#  IPSMRC4520
+#  IPSMRC4570
+#  IPSMRC8520
+#  IPSMRC8570
+#  MMMPRE4520
+#  MMMPRE4570
+#  MMMPRE8520
+#  MMMPRE8570
+#  Sycu_ch_grid
+#  Tuto_ch_grid
+#  Phbo_ch_grid
+#  
+#  res(clc_ch_grid)
+#  res(srtm_ch_grid)
+#  res(srtm_sa_grid)
+#  res(IPSMRC4570)
+#  res(IPSMRC4520)
+#  res(IPSMRC8520)
+#  res(IPSMRC8570)
+#  res(MMMPRE4520)
+#  res(MMMPRE4570)
+#  res(MMMPRE8520)
+#  res(MMMPRE8570)
+#  res(Sycu_ch_grid)
+#  res(Tuto_ch_grid)
+#  res(Phbo_ch_grid)
+#  
+#  extent(clc_ch_grid)
+#  extent(srtm_ch_grid)
+#  extent(srtm_sa_grid)
+#  extent(IPSMRC4570)
+#  extent(IPSMRC4520)
+#  extent(IPSMRC8520)
+#  extent(IPSMRC8570)
+#  extent(MMMPRE4520)
+#  extent(MMMPRE4570)
+#  extent(MMMPRE8520)
+#  extent(MMMPRE8570)
+#  extent(Sycu_ch_grid)
+#  extent(Tuto_ch_grid)
+#  extent(Phbo_ch_grid)
+#  
+#  # resample resolution srtm Data to resolution of clima data (0.11)
+#  srtm_ch_grid_r <- resample(srtm_ch_grid,IPSMRC4570, method = 'bilinear') # resample output
+#  srtm_ch_grid_r
+#  
+#  srtm_sa_grid_r <- resample(srtm_sa_grid,IPSMRC4570, method = 'bilinear') # resample output
+#  srtm_sa_grid_r
+#  
+#  # resample resolution CLC Data to resolution of clima data (0.11)
+#  clc_ch_grid_r <-resample(clc_ch_grid, IPSMRC4570, method = 'bilinear')
+#  clc_ch_grid_r
+#  
+#  # resample extent and resolution of Sycu_ch_grid
+#  Sycu_ch_grid <- resample(Sycu_ch_grid, IPSMRC4570, method="ngb")
+#  Sycu_ch_grid
+#  plot(Sycu_ch_grid)
+#  
+#  # resample extent and resolution of Tuto_ch_grid
+#  Tuto_ch_grid <- resample(Tuto_ch_grid, IPSMRC4570, method="ngb")
+#  Tuto_ch_grid
+#  plot(Tuto_ch_grid)
+#  
+#  # resample extent and resolution of Phbo_ch_grid
+#  Phbo_ch_grid <- resample(Phbo_ch_grid, IPSMRC4570, method="ngb")
+#  Phbo_ch_grid
+#  plot(Phbo_ch_grid)
+#  
+#  #Check again resampled resolutions
+#  res(clc_ch_grid_r)
+#  res(srtm_ch_grid_r)
+#  res(srtm_sa_grid_r)
+#  res(IPSMRC4570)
+#  res(IPSMRC4520)
+#  res(IPSMRC8520)
+#  res(IPSMRC8570)
+#  res(MMMPRE4520)
+#  res(MMMPRE4570)
+#  res(MMMPRE8520)
+#  res(MMMPRE8570)
+#  res(Sycu_ch_grid)
+#  res(Tuto_ch_grid)
+#  res(Phbo_ch_grid)
+#  
+#  #Check again resampled extents
+#  extent(clc_ch_grid_r)
+#  extent(srtm_ch_grid_r)
+#  extent(srtm_sa_grid_r)
+#  extent(IPSMRC4570)
+#  extent(IPSMRC4520)
+#  extent(IPSMRC8520)
+#  extent(IPSMRC8570)
+#  extent(MMMPRE4520)
+#  extent(MMMPRE4570)
+#  extent(MMMPRE8520)
+#  extent(MMMPRE8570)
+#  extent(Sycu_ch_grid)
+#  extent(Tuto_ch_grid)
+#  extent(Phbo_ch_grid)
+#  
+#  #Check again resampled extents
+#  extent(srtm_ch_grid_r)==extent(clc_ch_grid_r)
+#  extent(srtm_ch_grid_r)==extent(IPSMRC4520)
+#  
+#  #-------------------------------------------------------------------------------------------------
+#  # 4. MERGING DATAS FOR SWITZERLAND INTO ONE DATASET ( IPSMRC4520_ch ) (1991-2020)
+#  #-------------------------------------------------------------------------------------------------
+#  
+#  # Merge raster Bricks  together
+#  srtm_ch_grid_r
+#  srtm_sa_grid_r
+#  clc_ch_grid_r
+#  IPSMRC4520
+#  Sycu_ch_grid
+#  Tuto_ch_grid
+#  Phbo_ch_grid
+#  
+#  # Stack rasters to one raster stack
+#  Species_srtm_clim_clc_ch <- stack(srtm_ch_grid_r,srtm_sa_grid_r,IPSMRC4520, Sycu_ch_grid, Tuto_ch_grid, Phbo_ch_grid, clc_ch_grid_r)
+#  Species_srtm_clim_clc_ch
+#  
+#  #'**Note** This currently only uses one climate scenario and climate data from one time period
+#  groupkeys[1,]
+#  # Sp?ter, wenn alles mit [[1]] Funktioniert, alles wiederholen f?r alle 21 Gruppen (klima)
+#  
+#  # Check if srtm/climate data and bird locations intersect
+#  plot(Species_srtm_clim_clc_ch[[1:20]], maxnl=20)
+#  plot(Species_srtm_clim_clc_ch[[21:40]], maxnl=20)
+#  plot(Species_srtm_clim_clc_ch[[41:60]], maxnl=20)
+#  
+#  #' Your stack has 60 layers, the plot function generically only plots 16 maps
+#  #' Thus I changed the parameters to 20 and make three plots with all variables
+#  
+#  # convert Rasterdata in raster Stack (All three bird species)
+#  ChdatIPSMRC4520 <- as.data.frame(rasterToPoints(Species_srtm_clim_clc_ch)) %>% drop_na(alt_mean, alt_median, alt_min, alt_max, alt_sd,slope, aspect, bio1:bio19,
+#                                                                                          Sylvia.curruca.CH, Turdus.torquatus.CH, Phylloscopus.bonelli.CH) %>% replace(is.na(.), 0)
+#  ChdatIPSMRC4520
+#  
+#  ChdatIPSMRC4520 %>% ggplot() + geom_tile(aes(x=x, y=y, fill=`Sylvia.curruca.CH`)) + coord_sf()
+#  
+#  ChdatIPSMRC4520 %>% ggplot() + geom_tile(aes(x=x, y=y, fill=`Turdus.torquatus.CH`)) + coord_sf()
+#  
+#  ChdatIPSMRC4520 %>% ggplot() + geom_tile(aes(x=x, y=y, fill=`Phylloscopus.bonelli.CH`)) + coord_sf()
+
+## ---- eval=F------------------------------------------------------------------
+#  
+#  # Sylvia curruca: lesser whitetrhoat, species range data from Jakob Marti, acces via Amt fuer Umweltschutz und Energie, Kanton Glarus
+#  Sycu_gl <- read.csv("Sycu_GL.csv", sep = ";")
+#  Sycu_gl
+#  
+#  # Phylloscopus bonelli:  species range data from Jakob Marti,access via Amt fuer Umweltschutz und Energie, Kanton Glarus
+#  # Gridsize: Point Data
+#  Phbo_gl <- read.csv("Phbo_GL.csv", sep = ";")
+#  Phbo_gl
+#  # Landcover
+#  # Gridsize: 2km x 2km
+#  clc_gl <- read.csv("corine_lc_che_2km.csv.xz")
+#  
+#  # Load outline of Switzerland
+#  che1 <- getData('GADM', country='CHE', level=1)
+#  plot(che1)
+#  
+#  glarus<- subset(che1, NAME_1 == "Glarus" )
+#  plot(glarus)
+#  glarus_r <-raster(glarus)
+#  glarus_r
+#  
+#  # Elevation
+#  #Gridsize: 2km x 2km
+#  srtm_ch <- read.csv("srtm_csi_2km_che.csv.xz")
+#  
+#  # Climate data: Scenarios CH2018
+#  
+#  IPSMRC8520 <-stack("ch2018_IPSL_SMHI-RCA_RCP85_1991-2020.tif")
+#  IPSMRC8520
+#  names(IPSMRC8520) <- paste0("bio", 1:19)
+#  names(IPSMRC8520)
+#  
+#  # test plots------------------------
+#  
+#  plot(IPSMRC8520[[1]]) # temperature
+#  plot(IPSMRC8520[[12]]) # precipitation
+#  #-----------------------------------
+#  
+#  #----------------------------------------------------------------------------------------------------
+#  # 2. REFORMATE DATA INTO RASTERGRID (2 km x 2 km )
+#  #-----------------------------------------------------------------------------------------------------
+#  
+#  # no gridding for Bird species: nicht rasterisieren, dann alle Daten von den Vogeldaten extrahieren...
+#  # Sylvia curruca and Phylloscopus bonelli
+#  
+#  Sycu_gl
+#  coordinates(Sycu_gl) <- ~x+y # set coordinates
+#  projection(Sycu_gl) <- CRS("+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +units=m +no_defs") # set projection
+#  plot(Sycu_gl)
+#  
+#  Phbo_gl
+#  coordinates(Phbo_gl) <- ~x+y # set coordinates
+#  projection(Phbo_gl) <- CRS("+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +units=m +no_defs") # set projection
+#  Phbo_gl
+#  plot(Phbo_gl)
+#  
+#  #------------------
+#  
+#  # Landcover
+#  clc_gl_grid <- clc_gl %>% dplyr::select(c(x,y,var, X2018)) %>% spread(var, X2018) # hier erzeuge ich eine Gruppe die nur die Var. des X2018 ber?cksichtig
+#  coordinates(clc_gl_grid) <- ~x+y # set coordinates
+#  projection(clc_gl_grid) <- CRS("+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs") # set
+#  gridded(clc_gl_grid) <- TRUE
+#  clc_gl_grid <- stack(clc_gl_grid)
+#  clc_gl_grid
+#  
+#  clc_gl_grid <- projectRaster(clc_gl_grid, crs=CRS("+proj=longlat +datum=WGS84"))
+#  clc_gl_grid
+#  plot(clc_gl_grid)
+#  
+#  #--------------------
+#  
+#  # Elevation
+#  # Gridsize: 2km x 2km
+#  srtm_gl_grid <- srtm_ch
+#  coordinates(srtm_gl_grid) <- ~x+y # set coordinates
+#  gridded(srtm_gl_grid) <- TRUE                # grid the data
+#  projection(srtm_gl_grid) <- CRS("+proj=longlat +datum=WGS84") # set projection
+#  # Turn SpatialPixelsDataFrame into Raster Stack
+#  srtm_gl_grid <- stack(srtm_gl_grid)
+#  srtm_gl_grid
+#  plot(srtm_gl_grid)
+#  
+#  #--------------------------------
+#  # Elevation - Slope and Aspect
+#  
+#  # create slope and Ascpet of Elevationraster
+#  srtm_glsa_grid <- terrain(srtm_gl_grid$alt_mean, opt=c('slope', 'aspect'), unit='degrees')
+#  plot(srtm_glsa_grid)
+#  srtm_glsa_grid <- stack(srtm_glsa_grid)
+#  
+#  #-------------------------------------------------------------------------------------------------
+#  # 3 CHANGE RESOLUTION INTO GRIDSIZE 2 km x 2 km (0.02 ? degree)
+#  #------------------------------------------------------------------------------------------------
+#  
+#  # show resolutions and extents to compare
+#  glarus
+#  clc_gl_grid
+#  srtm_gl_grid
+#  srtm_glsa_grid
+#  IPSMRC4520
+#  
+#  res(clc_gl_grid)
+#  res(srtm_gl_grid)
+#  res(srtm_glsa_grid)
+#  res(IPSMRC4520)
+#  
+#  extent(clc_gl_grid)
+#  extent(srtm_gl_grid)
+#  extent(srtm_glsa_grid)
+#  extent(glarus)
+#  extent(IPSMRC4520)
+#  
+#  # resample resolution of climate data to resolution of clc_data (0.11)
+#  IPSMRC8520_r <- resample(IPSMRC8520,srtm_gl_grid, method = 'bilinear')
+#  IPSMRC8520_r
+#  
+#  srtm_glsa_grid_r <- resample(srtm_glsa_grid,srtm_gl_grid, method = 'bilinear') # resample output
+#  srtm_glsa_grid_r
+#  
+#  clc_gl_grid_r <- resample(clc_gl_grid,srtm_gl_grid, method = 'bilinear') # resample output
+#  clc_gl_grid_r
+#  
+#  extent(clc_gl_grid_r)
+#  extent(srtm_gl_grid)
+#  extent(srtm_glsa_grid_r)
+#  extent(IPSMRC8520_r)
+#  
+#  #Check again resampled resolutions
+#  res(clc_gl_grid_r)
+#  res(srtm_glsa_grid_r)
+#  res(IPSMRC8520_r)
+#  
+#  # Stack rasters to one raster stack
+#  srtm_clim_clc_gl <- raster::stack(srtm_gl_grid,srtm_glsa_grid_r,IPSMRC8520_r,clc_gl_grid_r)
+#  srtm_clim_clc_gl
+#  
+#  #-----------------------------------------------------
+#  # Zuschneiden der Extents auf Fl?che Objekt glarus
+#  #-----------------------------------------------------
+#  
+#  srtm_clim_clc_gl_r <-crop(srtm_clim_clc_gl,glarus)
+

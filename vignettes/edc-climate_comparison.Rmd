@@ -1,0 +1,131 @@
+---
+title: "Climate data comparison for Europe"
+author: "RS-eco"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Climate data comparison for Europe}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = T, comment = NA, warning=F, message=F, eval=T, 
+  echo=T, error=F, comment = "#>"
+)
+```
+
+## Load packages & data
+
+```{r pa-overview}
+# Load edc & ggplot2 package
+library(edc); library(dplyr); library(tidyr); library(ggplot2); library(patchwork)
+
+# Load e-obs climate data from bavDC package
+# Rainfall
+load(system.file("extdata", "e-obs_rr_ens_mean_0.1deg_eur_yearmon.rda", package = "edc"))
+# Mean temperature
+load(system.file("extdata", "e-obs_tg_ens_mean_0.1deg_eur_yearmon.rda", package = "edc"))
+
+# WFDE5 re-analysis climate data (0.5°)
+data("wfde5_rainf_eur")
+data("wfde5_tair_eur") # In Kelvin
+
+# Define standard colour scheme
+whitered <- colorRampPalette(c('#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'))(255)
+#pie(rep(1,9),col=c('#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'))
+
+whiteblue <- colorRampPalette(c('#f7fcf0','#e0f3db','#ccebc5','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'))(255)
+#pie(rep(1,9),col=c('#f7fcf0','#e0f3db','#ccebc5','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'))
+
+bluewhitered <- colorRampPalette(c("#009392","#39b185","#9ccb86","#e9e29c","#eeb479","#e88471","#cf597e"))(255)
+#pie(rep(1,7),col=c("#009392","#39b185","#9ccb86","#e9e29c","#eeb479","#e88471","#cf597e"))
+```
+
+## Plot time-series of monthly climate data
+
+```{r, fig.width=9, fig.height=6}
+## Plot of tmean
+eobs_tmean <- `e-obs_tg_ens_mean_0.1deg_eur_yearmon` %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="tmean") %>%
+  group_by(date) %>% summarise(`e-obs`=mean(tmean, na.rm=T))
+wfde5_tair_eur <- wfde5_tair_eur %>% group_by(x,y) %>% 
+  mutate_at(vars(-group_cols()), .funs=function(x){x - 273.15})
+wfde5_tmean <- wfde5_tair_eur  %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="tmean") %>%
+  group_by(date) %>% summarise(wfde5=mean(tmean, na.rm=T))
+#head(eobs_tmean)
+#head(wfde5_tmean)
+
+all_tmean <- full_join(eobs_tmean, wfde5_tmean) %>% 
+  tidyr::pivot_longer(cols=-date, names_to="Dataset", values_to="tmean")
+all_tmean$date <- zoo::as.yearmon(all_tmean$date, "%B %Y")
+
+p1 <- all_tmean %>% ggplot(aes(x=date, y=tmean, col=Dataset)) +
+  geom_line() + theme_bw()
+
+## Plot of precipitation
+eobs_pr <- `e-obs_rr_ens_mean_0.1deg_eur_yearmon` %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="pr") %>%
+  group_by(date) %>% summarise(`e-obs`=mean(pr, na.rm=T))
+wfde5_pr <- wfde5_rainf_eur  %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="pr") %>%
+  group_by(date) %>% summarise(wfde5=mean(pr*3600, na.rm=T)) # Turn kg m−2 s−1 into mm (multiply by time)
+wfde5_pr$date <- sub(pattern="[.]", replacement=" ", x=wfde5_pr$date)
+
+#head(eobs_pr)
+#head(wfde5_pr)
+
+all_pr <- full_join(eobs_pr, wfde5_pr) %>% 
+  tidyr::pivot_longer(cols=-date, names_to="Dataset", values_to="pr") 
+all_pr$date <- zoo::as.yearmon(all_pr$date, "%B %Y")
+p2 <- all_pr %>% ggplot(aes(x=date, y=pr, col=Dataset)) +
+  geom_line() + theme_bw()
+
+p1 / p2 + plot_layout(guides="collect")
+```
+
+# Plot spatial maps of different data sets
+
+```{r, fig.width=9, fig.height=6}
+## Plot of tmean
+eobs_tmean <- `e-obs_tg_ens_mean_0.1deg_eur_yearmon` %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="e-obs") %>%
+  filter(date %in% c("Mär 1980", "Jun 1990", "Sep 2000", "Dez 2010"))
+wfde5_tmean <- wfde5_tair_eur  %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="tmean") %>%
+  rename(wfde5=tmean) %>% filter(date %in% c("Mär 1980", "Jun 1990", "Sep 2000", "Dez 2010")) 
+
+#head(eobs_tmean)
+#head(wfde5_tmean)
+
+all_tmean <- full_join(eobs_tmean, wfde5_tmean) %>%
+  tidyr::pivot_longer(cols=-c(x,y,date), names_to="Dataset", values_to="tmean") %>% drop_na()
+all_tmean$date <- zoo::as.yearmon(all_tmean$date, "%B %Y")
+
+all_tmean %>% ggplot(aes(x=x, y=y, fill=tmean)) +
+  facet_grid(date~Dataset, scales="free") + geom_raster() +
+  theme_bw() + scale_fill_gradientn(colours=bluewhitered) + labs(x="", y="")
+
+## Plot of precipitation
+eobs_pr <- `e-obs_rr_ens_mean_0.1deg_eur_yearmon` %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="e-obs") %>%
+  filter(date %in% c("Mär 1980", "Jun 1990", "Sep 2000", "Dez 2010"))
+wfde5_pr <- wfde5_rainf_eur  %>% 
+  tidyr::pivot_longer(cols=-c(x,y), names_to="date", values_to="pr")  %>%
+  filter(date %in% c("Mär 1980", "Jun 1990", "Sep 2000", "Dez 2010")) %>%
+  mutate(wfde5=pr*3600) %>% select(-pr) # Turn kg m−2 s−1 into mm (multiply by time)
+
+head(eobs_pr)
+head(wfde5_pr)
+
+all_pr <- full_join(eobs_pr, wfde5_pr) %>% 
+  tidyr::pivot_longer(cols=-c(x,y,date), names_to="Dataset", values_to="pr") %>% drop_na()
+all_pr$date <- zoo::as.yearmon(all_pr$date, "%B %Y")
+all_pr %>% ggplot(aes(x=x, y=y, fill=pr)) +
+  facet_grid(date~Dataset, scales="free") + geom_raster() + 
+  theme_bw() + scale_fill_gradientn(colours=whiteblue) + labs(x="", y="")
+```
