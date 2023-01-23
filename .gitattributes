@@ -1,2 +1,0 @@
-inst/extdata/e-obs_tg_ens_mean_0.1deg_eur_yearmon.rda filter=lfs diff=lfs merge=lfs -text
-inst/extdata/e-obs_tn_ens_mean_0.1deg_eur_yearmon.rda filter=lfs diff=lfs merge=lfs -text
