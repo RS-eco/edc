@@ -7,6 +7,7 @@ knitr::opts_chunk$set(
 )
 
 ## ----load_pkgs----------------------------------------------------------------
+rm(list=ls()); invisible(gc())
 library(dplyr); library(magrittr); library(tidyr); library(ggplot2)
 library(ggthemes); library(patchwork); library(zoo)
 
@@ -113,6 +114,7 @@ dat %>% ggplot() + geom_tile(aes(x=x, y=y, fill=value)) + geom_sf(data=europe, f
   facet_grid(rcp~time_frame, switch = "y") + scale_fill_gradientn(name="bio15", colours=whiteblue, limits=lim, values=col_val) + 
   coord_sf() + theme_few() + theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + 
   labs(x="", y="")
+rm(dat); invisible(gc())
 
 ## ---- fig.width=10, fig.height=7----------------------------------------------
 # Plot bioclimatic changes between 1991-2020 and 2021 - 2050
@@ -124,18 +126,19 @@ bioclim_30yr$rel_change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)/b
 
 col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
-p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_wrap(.~rcp, switch="y") + 
   scale_fill_gradientn(name="change", colours=whitered, limits=lim, values=col_val) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio1")
 
 #col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
 #lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
-p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_wrap(.~rcp, switch="y") + 
   scale_fill_gradientn(name="% change", colours=whitered) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
-p1 + p2 + plot_layout(ncol=1)
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio1")
+p1 / p2
+rm(p1, p2)
 
 ## ---- fig.width=10, fig.height=7----------------------------------------------
 # Plot bioclimatic changes between 1991-2020 and 2021 - 2050
@@ -147,18 +150,18 @@ bioclim_30yr$rel_change <- (bioclim_30yr$`2041-2070`-bioclim_30yr$`1991-2020`)/b
 
 col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
-p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_wrap(.~rcp, switch="y") + 
   scale_fill_gradientn(name="change", colours=whiteblue, limits=lim, values=col_val) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio12")
 
 col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
-p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_wrap(.~rcp, switch="y") + 
   scale_fill_gradientn(name="% change", colours=whiteblue, limits=lim, values=col_val) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
-p1 + p2 + plot_layout(ncol=1)
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio12")
+p1 / p2
 
 ## ---- fig.width=10, fig.height=7----------------------------------------------
 # Plot bioclimatic changes between 1991-2020 and 2021 - 2050
@@ -170,19 +173,19 @@ bioclim_30yr$rel_change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)/b
 
 col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
-p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_wrap(.~rcp) + 
   scale_fill_gradientn(name="change", colours=whitered, limits=lim, values=col_val) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio1")
 
 #col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
 #lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
 p2 <- bioclim_30yr %>% 
-  ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+  ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_wrap(.~rcp) + 
   scale_fill_gradientn(name="% change", colours=whitered) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
-p1 + p2 + plot_layout(ncol=1)
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio1")
+p1 / p2
 
 ## ---- fig.width=10, fig.height=7----------------------------------------------
 # Plot bioclimatic changes between 1991-2020 and 2021 - 2050
@@ -194,17 +197,17 @@ bioclim_30yr$rel_change <- (bioclim_30yr$`2071-2100`-bioclim_30yr$`1991-2020`)/b
 
 col_val <- scales::rescale(quantile(bioclim_30yr$change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$change, na.rm=T), max(bioclim_30yr$change, na.rm=T))
-p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_grid(var~rcp, switch="y") + 
+p1 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=change)) + facet_wrap(.~rcp) + 
   scale_fill_gradientn(name="change", colours=whiteblue, limits=lim, values=col_val) +
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio12")
 
 col_val <- scales::rescale(quantile(bioclim_30yr$rel_change, probs=seq(0,1,0.12)))
 lim <- c(min(bioclim_30yr$rel_change, na.rm=T), max(bioclim_30yr$rel_change, na.rm=T))
-p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_grid(var~rcp, switch="y") + 
+p2 <- bioclim_30yr %>% ggplot() + geom_tile(aes(x=x, y=y, fill=rel_change)) + facet_wrap(.~rcp) + 
   scale_fill_gradientn(name="% change", colours=whiteblue, limits=lim, values=col_val) + 
   geom_sf(data=europe, fill="NA") + coord_sf() + theme_few() + 
-  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="")
-p1 + p2 + plot_layout(ncol=1)
+  theme(strip.placement = "outside", axis.text.x = element_text(angle=45, vjust=0.5)) + labs(x="", y="bio12")
+p1 / p2
 rm(list=ls()); gc()
 

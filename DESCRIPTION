@@ -2,15 +2,16 @@ Package: edc
 Type: Package
 Title: European Data Cube
 Version: 0.0.1
-Date: 2023-01-12
+Date: 2023-01-25
 Authors@R: 
     person("RS-eco", email = "RS-eco@posteo.de", role = c("cre", "aut"))
 Maintainer: RS-eco <rs-eco@posteo.de>
 Description: R package to access various data sources for Europe, i.e. elevation, climate and land-use data.
 Depends: R (>= 3.5)
-Imports: raster, ggplot2, sf, dplyr, sp, tidyr
+Imports: dplyr
 Suggests: knitr, rmarkdown, qpdf, magrittr, scales, scico, 
-    ggthemes, ggpubr, zoo, lubridate, patchwork, caret, letsR, remotes, mecofun
+    raster, ggplot2, sf, sp, tidyr, caret, letsR, ggthemes, 
+    ggpubr, zoo, lubridate, patchwork, remotes, mecofun
 License: file LICENSE
 LazyData: TRUE
 LazyDataCompression: xz

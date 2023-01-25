@@ -232,5 +232,6 @@ The zoning of UNESCO Biosphere Reserves data for Europe can be accessed
 by:
 
 ``` r
-load(system.file("extdata", "unesco_br_zones_eur.rda", package = "edc"))  # simplified to reduce file size
+load(system.file("extdata", "unesco_br_zones_eur.rda", package = "edc"))
+# a simplified version to reduce file size
 ```
